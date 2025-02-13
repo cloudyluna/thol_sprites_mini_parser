@@ -1,0 +1,11 @@
+dist/
+.direnv/
+/target
+*.zip
+*.tar.gz
+*.xz
+*.gz
+list*
+*.yaml
+plugins*
+objects.json
