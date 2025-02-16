@@ -11,10 +11,24 @@ pub mod types {
         pub kind: ObjectKind,
         pub num_sprites: u64,
         pub sprites: Vec<Sprite>,
+        pub sprites_additive_blend: Option<Vec<i64>>,
         pub head_index: Vec<i64>,
         pub body_index: Vec<i64>,
         pub back_foot_index: Vec<i64>,
         pub front_foot_index: Vec<i64>,
+    }
+
+    #[derive(Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub enum SpritesBlockTerminator {
+        SpritesAdditiveBlend((Vec<i64>, Vec<i64>)),
+        HeadIndex(Vec<i64>),
+    }
+
+    impl Default for SpritesBlockTerminator {
+        fn default() -> Self {
+            Self::HeadIndex(vec![-1])
+        }
     }
 
     #[derive(Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -134,6 +148,7 @@ use winnow::{
 use types::{
     AgeRange, ClothingObject, ColorRGB, NonPersonObject, Number, Object,
     ObjectKind, PersonCharacteristic, Position, Sprite,
+    SpritesBlockTerminator,
 };
 
 pub fn parse(objects_dir: &PathBuf) -> anyhow::Result<Vec<Object>> {
@@ -216,8 +231,18 @@ fn parse_object(input: &mut &str) -> Result<Object> {
     take_until(0.., "numSprites").parse_next(input)?;
     let num_sprites: u64 = parse_assignment(input, "numSprites", dec_uint)?;
     separator(input)?;
-    let (sprites, head_index) = parse_sprites(input)?;
+    let (sprites, sprites_block_terminator) = parse_sprites(input)?;
+    let mut head_index = vec![];
+    let mut sprites_additive_blend = None;
+    match sprites_block_terminator {
+        SpritesBlockTerminator::SpritesAdditiveBlend((blend, index)) => {
+            sprites_additive_blend = Some(blend);
+            head_index = index
+        }
+        SpritesBlockTerminator::HeadIndex(index) => head_index = index,
+    }
     separator(input)?;
+
     let body_index = parse_assignment(input, "bodyIndex", parse_index_list)?;
     separator(input)?;
 
@@ -234,6 +259,7 @@ fn parse_object(input: &mut &str) -> Result<Object> {
         kind,
         num_sprites,
         sprites,
+        sprites_additive_blend,
         head_index,
         body_index,
         back_foot_index,
@@ -374,6 +400,7 @@ pixHeight=0";
                             invis_cont: Some(Number(0.0))
                         }
                     ],
+                    sprites_additive_blend: None,
                     head_index: vec![-1],
                     body_index: vec![-1],
                     back_foot_index: vec![-1],
@@ -388,16 +415,38 @@ fn separator<'a>(input: &mut &'a str) -> Result<&'a str> {
     alt((line_ending, ",")).parse_next(input)
 }
 
-fn parse_sprites<'a>(input: &mut &'a str) -> Result<(Vec<Sprite>, Vec<i64>)> {
+fn parse_sprites<'a>(
+    input: &mut &'a str,
+) -> Result<(Vec<Sprite>, SpritesBlockTerminator)> {
     let parse_sprite_le = |i: &mut &'a str| {
         let sprite = parse_sprite(i)?;
         separator(i)?;
 
         Ok(sprite)
     };
-    let terminator =
+
+    let head_index_parser =
         |i: &mut &'a str| parse_assignment(i, "headIndex", parse_index_list);
-    let (sprites, head_index): (Vec<Sprite>, Vec<i64>) =
+
+    let g = |i: &mut &'a str| {
+        "spritesAdditiveBlend=".parse_next(i)?;
+        parse_index_list(i)
+    };
+
+    let terminator = |i: &mut &'a str| {
+        let v = opt(g).parse_next(i)?;
+
+        Ok(match v {
+            Some(x) => {
+                separator(i)?;
+                let head_index = head_index_parser(i)?;
+                SpritesBlockTerminator::SpritesAdditiveBlend((x, head_index))
+            }
+            None => SpritesBlockTerminator::HeadIndex(head_index_parser(i)?),
+        })
+    };
+
+    let (sprites, head_index): (Vec<Sprite>, SpritesBlockTerminator) =
         repeat_till(0.., parse_sprite_le, terminator).parse_next(input)?;
 
     Ok((sprites, head_index))
@@ -439,7 +488,10 @@ mod test_parse_sprites {
 
     use crate::parser::{
         parse_sprites,
-        types::{AgeRange, ColorRGB, Number, Position, Sprite},
+        types::{
+            AgeRange, ColorRGB, Number, Position, Sprite,
+            SpritesBlockTerminator,
+        },
     };
 
     #[test]
@@ -489,6 +541,7 @@ ageRange=-1.000000,-1.000000
 parent=-1
 invisHolding=0,invisWorn=0,behindSlots=0
 invisCont=0
+spritesAdditiveBlend=9,4,2
 headIndex=-1";
         assert_eq!(
             parse_sprites.parse_peek(source),
@@ -612,7 +665,7 @@ headIndex=-1";
                             invis_cont: Some(Number(0.0))
                         }
                     ],
-                    vec![-1]
+                    SpritesBlockTerminator::HeadIndex(vec![-1])
                 )
             ))
         );
