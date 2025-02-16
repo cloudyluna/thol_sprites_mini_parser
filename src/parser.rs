@@ -141,9 +141,17 @@ pub fn parse(objects_dir: &PathBuf) -> anyhow::Result<Vec<Object>> {
     for entry in fs::read_dir(objects_dir)? {
         let entry = entry?;
         let path = entry.path();
+        let non_object_files = vec![
+            "nextObjectNumber.txt",
+            "groundHeat_6.txt",
+            "groundHeat_5.txt",
+            "groundHeat_4.txt",
+        ];
+        let is_object_file =
+            !non_object_files.iter().any(|f| path == PathBuf::from(f));
 
         if let Some(ext) = path.extension() {
-            if ext == "txt" {
+            if ext == "txt" && is_object_file {
                 let content = fs::read_to_string(path)?;
 
                 if let Ok(obj) = parse_object(&mut content.as_str()) {
