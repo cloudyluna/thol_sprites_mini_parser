@@ -11,7 +11,7 @@ pub mod types {
         pub kind: ObjectKind,
         pub num_sprites: u64,
         pub sprites: Vec<Sprite>,
-        pub head_index: i64,
+        pub head_index: Vec<i64>,
         pub body_index: Vec<i64>,
         pub back_foot_index: Vec<i64>,
         pub front_foot_index: Vec<i64>,
@@ -120,11 +120,11 @@ pub mod types {
     }
 }
 
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, vec};
 
 use winnow::{
     ascii::{alphanumeric1, dec_int, dec_uint, float, line_ending},
-    combinator::{alt, opt, repeat_till},
+    combinator::{alt, opt, repeat_till, separated},
     error::{ContextError, ParserError},
     stream::{Compare, Stream, StreamIsPartial},
     token::{literal, none_of, take_until},
@@ -210,42 +210,14 @@ fn parse_object(input: &mut &str) -> Result<Object> {
     separator(input)?;
     let (sprites, head_index) = parse_sprites(input)?;
     separator(input)?;
-
-    // TODO:Refine array parser to handle this range dynamically.
-    let as_body_array = |i: &mut &str| {
-        let a = dec_int(i)?;
-        let more_than_one = opt(",").parse_next(i)?;
-        match more_than_one {
-            Some(_) => {
-                let (b, _, c, _, d) =
-                    (dec_int, ",", dec_int, ",", dec_int).parse_next(i)?;
-                Ok(vec![a, b, c, d])
-            }
-            None => Ok(vec![a]),
-        }
-    };
-
-    let as_limb_array = |i: &mut &str| {
-        let a = dec_int(i)?;
-        let more_than_one = opt(",").parse_next(i)?;
-        match more_than_one {
-            Some(_) => {
-                let (b, _, c, _, d, _, e) =
-                    (dec_int, ",", dec_int, ",", dec_int, ",", dec_int)
-                        .parse_next(i)?;
-                Ok(vec![a, b, c, d, e])
-            }
-            None => Ok(vec![a]),
-        }
-    };
-    let body_index = parse_assignment(input, "bodyIndex", as_body_array)?;
+    let body_index = parse_assignment(input, "bodyIndex", parse_index_list)?;
     separator(input)?;
 
     let back_foot_index =
-        parse_assignment(input, "backFootIndex", as_limb_array)?;
+        parse_assignment(input, "backFootIndex", parse_index_list)?;
     separator(input)?;
     let front_foot_index =
-        parse_assignment(input, "frontFootIndex", as_limb_array)?;
+        parse_assignment(input, "frontFootIndex", parse_index_list)?;
 
     Ok(Object {
         id,
@@ -262,6 +234,8 @@ fn parse_object(input: &mut &str) -> Result<Object> {
 
 #[cfg(test)]
 mod parse_object_tests {
+
+    use std::vec;
 
     use winnow::Parser;
 
@@ -459,7 +433,7 @@ frontFootIndex=6,15,17,30,36";
                             invis_cont: Some(Number(0.0))
                         }
                     ],
-                    head_index: -1,
+                    head_index: vec![-1],
                     body_index: vec![4, 9, 12, 1],
                     back_foot_index: vec![9, 19, 22, 33, 39],
                     front_foot_index: vec![6, 15, 17, 30, 36],
@@ -473,7 +447,7 @@ fn separator<'a>(input: &mut &'a str) -> Result<&'a str> {
     alt((line_ending, ",")).parse_next(input)
 }
 
-fn parse_sprites<'a>(input: &mut &'a str) -> Result<(Vec<Sprite>, i64)> {
+fn parse_sprites<'a>(input: &mut &'a str) -> Result<(Vec<Sprite>, Vec<i64>)> {
     let parse_sprite_le = |i: &mut &'a str| {
         let sprite = parse_sprite(i)?;
         separator(i)?;
@@ -481,11 +455,41 @@ fn parse_sprites<'a>(input: &mut &'a str) -> Result<(Vec<Sprite>, i64)> {
         Ok(sprite)
     };
     let terminator =
-        |i: &mut &'a str| parse_assignment(i, "headIndex", dec_int);
-    let (sprites, head_index): (Vec<Sprite>, i64) =
+        |i: &mut &'a str| parse_assignment(i, "headIndex", parse_index_list);
+    let (sprites, head_index): (Vec<Sprite>, Vec<i64>) =
         repeat_till(0.., parse_sprite_le, terminator).parse_next(input)?;
 
     Ok((sprites, head_index))
+}
+
+fn parse_index_list(input: &mut &str) -> Result<Vec<i64>> {
+    let (first_elem, has_many) =
+        (dec_int::<_, i64, _>, opt(",")).parse_next(input)?;
+
+    match has_many {
+        Some(_) => {
+            let elems: Vec<i64> = separated(0.., dec_int::<_, i64, _>, ",")
+                .parse_next(input)?;
+
+            Ok([vec![first_elem], elems].concat())
+        }
+        None => Ok(vec![first_elem]),
+    }
+}
+
+#[cfg(test)]
+mod test_parse_index_list {
+    use winnow::Parser;
+
+    use crate::parser::parse_index_list;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            parse_index_list.parse_peek("1,3,5,9,2"),
+            Ok(("", vec![1, 3, 5, 9, 2]))
+        );
+    }
 }
 
 #[cfg(test)]
@@ -667,7 +671,7 @@ headIndex=-1";
                             invis_cont: Some(Number(0.0))
                         }
                     ],
-                    -1
+                    vec![-1]
                 )
             ))
         );
