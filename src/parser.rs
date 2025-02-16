@@ -496,52 +496,31 @@ mod test_parse_sprites {
 
     #[test]
     fn test() {
-        let source = "spriteID=110013
-pos=40.000000,-23.000000
+        let source = "spriteID=553
+pos=3.000000,-34.000000
 rot=0.000000
 hFlip=0
 color=1.000000,1.000000,1.000000
 ageRange=-1.000000,-1.000000
 parent=-1
 invisHolding=0,invisWorn=0,behindSlots=0
-invisCont=0
-spriteID=110013
-pos=-12.000000,-9.000000
-rot=0.000000
-hFlip=1
-color=1.000000,1.000000,1.000000
-ageRange=-1.000000,-1.000000
-parent=-1
-invisHolding=0,invisWorn=0,behindSlots=0
-invisCont=0
-spriteID=110013
-pos=-39.000000,-16.000000
+spriteID=551
+pos=-8.000000,-31.000000
 rot=0.000000
 hFlip=0
 color=1.000000,1.000000,1.000000
 ageRange=-1.000000,-1.000000
 parent=-1
 invisHolding=0,invisWorn=0,behindSlots=0
-invisCont=0
-spriteID=493
-pos=1.000000,-35.000000
+spriteID=552
+pos=-10.000000,-41.000000
 rot=0.000000
 hFlip=0
 color=1.000000,1.000000,1.000000
 ageRange=-1.000000,-1.000000
 parent=-1
 invisHolding=0,invisWorn=0,behindSlots=0
-invisCont=0
-spriteID=110013
-pos=16.000000,-12.000000
-rot=0.000000
-hFlip=0
-color=1.000000,1.000000,1.000000
-ageRange=-1.000000,-1.000000
-parent=-1
-invisHolding=0,invisWorn=0,behindSlots=0
-invisCont=0
-spritesAdditiveBlend=9,4,2
+spritesAdditiveBlend=0,5,3,1
 headIndex=-1";
         assert_eq!(
             parse_sprites.parse_peek(source),
@@ -550,10 +529,10 @@ headIndex=-1";
                 (
                     vec![
                         Sprite {
-                            id: 110013,
+                            id: 553,
                             position: Position {
-                                x: Number(40.0),
-                                y: Number(-23.0)
+                                x: Number(3.0),
+                                y: Number(-34.0)
                             },
                             rot: Number(0.0),
                             h_flip: Number(0.0),
@@ -570,36 +549,13 @@ headIndex=-1";
                             invis_holding: Number(0.0),
                             invis_worn: Number(0.0),
                             behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
+                            invis_cont: None
                         },
                         Sprite {
-                            id: 110013,
+                            id: 551,
                             position: Position {
-                                x: Number(-12.0),
-                                y: Number(-9.0)
-                            },
-                            rot: Number(0.0),
-                            h_flip: Number(1.0),
-                            color: ColorRGB {
-                                r: Number(1.0),
-                                g: Number(1.0),
-                                b: Number(1.0)
-                            },
-                            age_range: AgeRange {
-                                min: Number(-1.0),
-                                max: Number(-1.0)
-                            },
-                            parent: -1,
-                            invis_holding: Number(0.0),
-                            invis_worn: Number(0.0),
-                            behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
-                        },
-                        Sprite {
-                            id: 110013,
-                            position: Position {
-                                x: Number(-39.0),
-                                y: Number(-16.0)
+                                x: Number(-8.0),
+                                y: Number(-31.0)
                             },
                             rot: Number(0.0),
                             h_flip: Number(0.0),
@@ -616,13 +572,13 @@ headIndex=-1";
                             invis_holding: Number(0.0),
                             invis_worn: Number(0.0),
                             behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
+                            invis_cont: None
                         },
                         Sprite {
-                            id: 493,
+                            id: 552,
                             position: Position {
-                                x: Number(1.0),
-                                y: Number(-35.0)
+                                x: Number(-10.0),
+                                y: Number(-41.0)
                             },
                             rot: Number(0.0),
                             h_flip: Number(0.0),
@@ -639,33 +595,13 @@ headIndex=-1";
                             invis_holding: Number(0.0),
                             invis_worn: Number(0.0),
                             behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
-                        },
-                        Sprite {
-                            id: 110013,
-                            position: Position {
-                                x: Number(16.0),
-                                y: Number(-12.0)
-                            },
-                            rot: Number(0.0),
-                            h_flip: Number(0.0),
-                            color: ColorRGB {
-                                r: Number(1.0),
-                                g: Number(1.0),
-                                b: Number(1.0)
-                            },
-                            age_range: AgeRange {
-                                min: Number(-1.0),
-                                max: Number(-1.0)
-                            },
-                            parent: -1,
-                            invis_holding: Number(0.0),
-                            invis_worn: Number(0.0),
-                            behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
+                            invis_cont: None
                         }
                     ],
-                    SpritesBlockTerminator::HeadIndex(vec![-1])
+                    SpritesBlockTerminator::SpritesAdditiveBlend((
+                        vec![0, 5, 3, 1],
+                        vec![-1]
+                    ))
                 )
             ))
         );
@@ -700,8 +636,13 @@ fn parse_sprite<'a>(input: &mut &'a str) -> Result<Sprite> {
     let invis_worn = parse_assignment(input, "invisWorn", parse_number)?;
     separator(input)?;
     let behind_slots = parse_assignment(input, "behindSlots", parse_number)?;
-    opt(separator).parse_next(input)?;
-    let invis_cont = opt(parse_invis_cont).parse_next(input)?;
+
+    let f = |i: &mut &'a str| {
+        separator(i)?;
+        parse_invis_cont(i)
+    };
+
+    let invis_cont = opt(f).parse_next(input)?;
 
     Ok(Sprite {
         id,
