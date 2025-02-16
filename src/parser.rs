@@ -159,7 +159,7 @@ pub fn parse(objects_dir: &PathBuf) -> anyhow::Result<Vec<Object>> {
     for entry in fs::read_dir(objects_dir)? {
         let entry = entry?;
         let path = entry.path();
-        let non_object_files = vec![
+        let non_object_files = [
             "nextObjectNumber.txt",
             "groundHeat_6.txt",
             "groundHeat_5.txt",
@@ -286,7 +286,7 @@ mod parse_object_tests {
         parse_object,
         types::{
             AgeRange, ColorRGB, NonPersonObject, Number, Object, ObjectKind,
-            PersonCharacteristic, Position, Sprite,
+            Position, Sprite,
         },
     };
 
@@ -426,9 +426,9 @@ fn separator<'a>(input: &mut &'a str) -> Result<&'a str> {
     alt((line_ending, ",")).parse_next(input)
 }
 
-fn parse_sprites<'a>(
-    input: &mut &'a str,
-) -> Result<(Vec<Sprite>, (SpritesBlockTerminator, Vec<i64>))> {
+type SpriteBlock = (Vec<Sprite>, (SpritesBlockTerminator, Vec<i64>));
+
+fn parse_sprites<'a>(input: &mut &'a str) -> Result<SpriteBlock> {
     let parse_sprite_le = |i: &mut &'a str| {
         let sprite = parse_sprite(i)?;
         separator(i)?;
