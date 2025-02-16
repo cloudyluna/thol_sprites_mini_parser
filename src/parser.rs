@@ -23,7 +23,7 @@ pub mod types {
     #[serde(rename_all = "camelCase")]
     pub enum SpritesBlockTerminator {
         SpritesDrawnBehind(Vec<i64>),
-        SpritesAdditiveBlend(Vec<i64>),
+        SpritesAdditiveBlend((Vec<i64>, Option<Vec<i64>>)),
         HeadIndex,
     }
 
@@ -166,7 +166,7 @@ pub fn parse(objects_dir: &PathBuf) -> anyhow::Result<Vec<Object>> {
             "groundHeat_4.txt",
         ];
         let is_object_file =
-            !non_object_files.iter().any(|f| path == PathBuf::from(f));
+            !non_object_files.iter().any(|f| path.ends_with(f));
 
         if let Some(ext) = path.extension() {
             if ext == "txt" && is_object_file {
@@ -175,10 +175,6 @@ pub fn parse(objects_dir: &PathBuf) -> anyhow::Result<Vec<Object>> {
                 if let Ok(obj) = parse_object(&mut content.as_str()) {
                     objects.push(obj);
                 }
-                /*let obj = parse_object(&mut content.as_str())
-                    .expect(format!("{}", path.display()).as_str());
-                objects.push(obj);
-                */
             }
         }
     }
@@ -243,8 +239,11 @@ fn parse_object(input: &mut &str) -> Result<Object> {
     let mut sprites_drawn_behind = None;
     let mut sprites_additive_blend = None;
     match sprites_block_terminator {
-        SpritesBlockTerminator::SpritesDrawnBehind(behind) => (),
-        SpritesBlockTerminator::SpritesAdditiveBlend(blend) => {
+        SpritesBlockTerminator::SpritesDrawnBehind(behind) => {
+            sprites_drawn_behind = Some(behind)
+        }
+        SpritesBlockTerminator::SpritesAdditiveBlend((blend, behind)) => {
+            sprites_drawn_behind = behind;
             sprites_additive_blend = Some(blend);
         }
         SpritesBlockTerminator::HeadIndex => (),
@@ -461,15 +460,15 @@ fn parse_sprites<'a>(
 
         let r = match a {
             Some(behind) => match b {
-                Some(blend) => {
-                    SpritesBlockTerminator::SpritesAdditiveBlend(blend)
-                }
+                Some(blend) => SpritesBlockTerminator::SpritesAdditiveBlend(
+                    (blend, Some(behind)),
+                ),
                 None => SpritesBlockTerminator::HeadIndex,
             },
             None => match b {
-                Some(blend) => {
-                    SpritesBlockTerminator::SpritesAdditiveBlend(blend)
-                }
+                Some(blend) => SpritesBlockTerminator::SpritesAdditiveBlend(
+                    (blend, None),
+                ),
                 None => SpritesBlockTerminator::HeadIndex,
             },
         };
@@ -639,9 +638,10 @@ headIndex=-1";
                         }
                     ],
                     (
-                        SpritesBlockTerminator::SpritesAdditiveBlend(vec![
-                            0, 5, 3, 1
-                        ]),
+                        SpritesBlockTerminator::SpritesAdditiveBlend((
+                            vec![0, 5, 3, 1],
+                            Some(vec![8, 3])
+                        )),
                         vec![-1]
                     )
                 )
