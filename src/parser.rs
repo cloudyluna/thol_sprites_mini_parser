@@ -97,6 +97,7 @@ pub mod types {
         pub invis_worn: Number,
         pub behind_slots: Number,
         pub invis_cont: Option<Number>,
+        pub ignored_cont: Option<Number>,
     }
 
     #[derive(
@@ -167,11 +168,15 @@ pub fn parse(objects_dir: &PathBuf) -> anyhow::Result<Vec<Object>> {
 
         if let Some(ext) = path.extension() {
             if ext == "txt" && is_object_file {
-                let content = fs::read_to_string(path)?;
+                let content = fs::read_to_string(&path)?;
 
                 if let Ok(obj) = parse_object(&mut content.as_str()) {
                     objects.push(obj);
                 }
+                /*let obj = parse_object(&mut content.as_str())
+                    .expect(format!("{}", path.display()).as_str());
+                objects.push(obj);
+                */
             }
         }
     }
@@ -374,7 +379,8 @@ pixHeight=0";
                             invis_holding: Number(0.0),
                             invis_worn: Number(0.0),
                             behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
+                            invis_cont: Some(Number(0.0)),
+                            ignored_cont: None,
                         },
                         Sprite {
                             id: 1304,
@@ -397,7 +403,8 @@ pixHeight=0";
                             invis_holding: Number(0.0),
                             invis_worn: Number(0.0),
                             behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
+                            invis_cont: Some(Number(0.0)),
+                            ignored_cont: None,
                         }
                     ],
                     sprites_additive_blend: None,
@@ -520,6 +527,7 @@ color=1.000000,1.000000,1.000000
 ageRange=-1.000000,-1.000000
 parent=-1
 invisHolding=0,invisWorn=0,behindSlots=0
+ignoredCont=5
 spritesAdditiveBlend=0,5,3,1
 headIndex=-1";
         assert_eq!(
@@ -549,7 +557,8 @@ headIndex=-1";
                             invis_holding: Number(0.0),
                             invis_worn: Number(0.0),
                             behind_slots: Number(0.0),
-                            invis_cont: None
+                            invis_cont: None,
+                            ignored_cont: None
                         },
                         Sprite {
                             id: 551,
@@ -572,7 +581,8 @@ headIndex=-1";
                             invis_holding: Number(0.0),
                             invis_worn: Number(0.0),
                             behind_slots: Number(0.0),
-                            invis_cont: None
+                            invis_cont: None,
+                            ignored_cont: None,
                         },
                         Sprite {
                             id: 552,
@@ -595,7 +605,8 @@ headIndex=-1";
                             invis_holding: Number(0.0),
                             invis_worn: Number(0.0),
                             behind_slots: Number(0.0),
-                            invis_cont: None
+                            invis_cont: None,
+                            ignored_cont: Some(Number(5.0))
                         }
                     ],
                     SpritesBlockTerminator::SpritesAdditiveBlend((
@@ -637,12 +648,20 @@ fn parse_sprite<'a>(input: &mut &'a str) -> Result<Sprite> {
     separator(input)?;
     let behind_slots = parse_assignment(input, "behindSlots", parse_number)?;
 
-    let f = |i: &mut &'a str| {
+    let invis_cont_le = |i: &mut &'a str| {
         separator(i)?;
         parse_invis_cont(i)
     };
 
-    let invis_cont = opt(f).parse_next(input)?;
+    let invis_cont = opt(invis_cont_le).parse_next(input)?;
+
+    let ignored_cont_le = |i: &mut &'a str| {
+        separator(i)?;
+        parse_assignment(i, "ignoredCont", parse_number)
+    };
+
+    let ignored_cont: Option<Number> =
+        opt(ignored_cont_le).parse_next(input)?;
 
     Ok(Sprite {
         id,
@@ -656,6 +675,7 @@ fn parse_sprite<'a>(input: &mut &'a str) -> Result<Sprite> {
         invis_worn,
         behind_slots,
         invis_cont,
+        ignored_cont,
     })
 }
 
@@ -728,7 +748,8 @@ invisCont=0";
                     invis_holding: Number(0.0),
                     invis_worn: Number(0.0),
                     behind_slots: Number(0.0),
-                    invis_cont: Some(Number(0.0))
+                    invis_cont: Some(Number(0.0)),
+                    ignored_cont: None
                 }
             ))
         );
