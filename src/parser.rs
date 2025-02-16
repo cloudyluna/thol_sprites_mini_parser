@@ -127,7 +127,7 @@ use winnow::{
     combinator::{alt, opt, repeat_till, separated},
     error::{ContextError, ParserError},
     stream::{Compare, Stream, StreamIsPartial},
-    token::{literal, none_of, take_until},
+    token::{literal, none_of, rest, take_until},
     Parser, Result,
 };
 
@@ -226,6 +226,7 @@ fn parse_object(input: &mut &str) -> Result<Object> {
     separator(input)?;
     let front_foot_index =
         parse_assignment(input, "frontFootIndex", parse_index_list)?;
+    rest(input)?; // skip the rest
 
     Ok(Object {
         id,
@@ -250,22 +251,48 @@ mod parse_object_tests {
     use crate::parser::{
         parse_object,
         types::{
-            AgeRange, ColorRGB, Number, Object, ObjectKind,
+            AgeRange, ColorRGB, NonPersonObject, Number, Object, ObjectKind,
             PersonCharacteristic, Position, Sprite,
         },
     };
 
     #[test]
     fn test() {
-        let source = "id=1
-wth is going on here?? meowi! spzz **@#HJasba sa whs
-person=1,spawn=0
+        let source = "id=7767
+Rose Crown with Rose
+containable=0
+containSize=1.000000,vertSlotRot=0.000000
+permanent=1,minPickupAge=3
+noFlip=0
+sideAccess=0
+heldInHand=0
+blocksWalking=0,leftBlockingRadius=0,rightBlockingRadius=0,drawBehindPlayer=0
+mapChance=0.000000#biomes_0
+heatValue=0
+rValue=0.000000
+person=0,noSpawn=0
 male=0
+deathMarker=0
+homeMarker=0
+floor=0
+floorHugging=0
+foodValue=0
+speedMult=1.000000
+heldOffset=2.000000,-10.000000
 clothing=n
-clothingOffset=0.2,4.0
-numSprites=7
-spriteID=110013
-pos=40.000000,-23.000000
+clothingOffset=0.000000,0.000000
+deadlyDistance=0
+useDistance=1
+sounds=34:0.250000,-1:0.0,-1:0.0,-1:0.0
+creationSoundInitialOnly=0
+creationSoundForce=0
+numSlots=0#timeStretch=1.000000
+slotSize=1.000000
+slotsLocked=0
+slotsNoSwap=0
+numSprites=2
+spriteID=111068
+pos=-1.000000,-29.000000
 rot=0.000000
 hFlip=0
 color=1.000000,1.000000,1.000000
@@ -273,36 +300,9 @@ ageRange=-1.000000,-1.000000
 parent=-1
 invisHolding=0,invisWorn=0,behindSlots=0
 invisCont=0
-spriteID=110013
-pos=-12.000000,-9.000000
-rot=0.000000
-hFlip=1
-color=1.000000,1.000000,1.000000
-ageRange=-1.000000,-1.000000
-parent=-1
-invisHolding=0,invisWorn=0,behindSlots=0
-invisCont=0
-spriteID=110013
-pos=-39.000000,-16.000000
-rot=0.000000
-hFlip=0
-color=1.000000,1.000000,1.000000
-ageRange=-1.000000,-1.000000
-parent=-1
-invisHolding=0,invisWorn=0,behindSlots=0
-invisCont=0
-spriteID=493
-pos=1.000000,-35.000000
-rot=0.000000
-hFlip=0
-color=1.000000,1.000000,1.000000
-ageRange=-1.000000,-1.000000
-parent=-1
-invisHolding=0,invisWorn=0,behindSlots=0
-invisCont=0
-spriteID=110013
-pos=16.000000,-12.000000
-rot=0.000000
+spriteID=1304
+pos=4.000000,-34.000000
+rot=-0.025000
 hFlip=0
 color=1.000000,1.000000,1.000000
 ageRange=-1.000000,-1.000000
@@ -310,26 +310,28 @@ parent=-1
 invisHolding=0,invisWorn=0,behindSlots=0
 invisCont=0
 headIndex=-1
-bodyIndex=4,9,12,1
-backFootIndex=9,19,22,33,39
-frontFootIndex=6,15,17,30,36";
+bodyIndex=-1
+backFootIndex=-1
+frontFootIndex=-1
+numUses=1,1.000000
+useVanishIndex=-1
+useAppearIndex=-1
+pixHeight=0";
         assert_eq!(
             parse_object.parse_peek(source),
             Ok((
                 "",
                 Object {
-                    id: 1,
-                    description:
-                        "wth is going on here?? meowi! spzz **@#HJasba sa whs"
-                            .to_string(),
-                    kind: ObjectKind::Person(PersonCharacteristic::Feminine),
-                    num_sprites: 7,
+                    id: 7767,
+                    description: "Rose Crown with Rose".to_string(),
+                    kind: ObjectKind::NonPerson(NonPersonObject::Other),
+                    num_sprites: 2,
                     sprites: vec![
                         Sprite {
-                            id: 110013,
+                            id: 111068,
                             position: Position {
-                                x: Number(40.0),
-                                y: Number(-23.0)
+                                x: Number(-1.0),
+                                y: Number(-29.0)
                             },
                             rot: Number(0.0),
                             h_flip: Number(0.0),
@@ -349,81 +351,12 @@ frontFootIndex=6,15,17,30,36";
                             invis_cont: Some(Number(0.0))
                         },
                         Sprite {
-                            id: 110013,
+                            id: 1304,
                             position: Position {
-                                x: Number(-12.0),
-                                y: Number(-9.0)
+                                x: Number(4.0),
+                                y: Number(-34.0)
                             },
-                            rot: Number(0.0),
-                            h_flip: Number(1.0),
-                            color: ColorRGB {
-                                r: Number(1.0),
-                                g: Number(1.0),
-                                b: Number(1.0)
-                            },
-                            age_range: AgeRange {
-                                min: Number(-1.0),
-                                max: Number(-1.0)
-                            },
-                            parent: -1,
-                            invis_holding: Number(0.0),
-                            invis_worn: Number(0.0),
-                            behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
-                        },
-                        Sprite {
-                            id: 110013,
-                            position: Position {
-                                x: Number(-39.0),
-                                y: Number(-16.0)
-                            },
-                            rot: Number(0.0),
-                            h_flip: Number(0.0),
-                            color: ColorRGB {
-                                r: Number(1.0),
-                                g: Number(1.0),
-                                b: Number(1.0)
-                            },
-                            age_range: AgeRange {
-                                min: Number(-1.0),
-                                max: Number(-1.0)
-                            },
-                            parent: -1,
-                            invis_holding: Number(0.0),
-                            invis_worn: Number(0.0),
-                            behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
-                        },
-                        Sprite {
-                            id: 493,
-                            position: Position {
-                                x: Number(1.0),
-                                y: Number(-35.0)
-                            },
-                            rot: Number(0.0),
-                            h_flip: Number(0.0),
-                            color: ColorRGB {
-                                r: Number(1.0),
-                                g: Number(1.0),
-                                b: Number(1.0)
-                            },
-                            age_range: AgeRange {
-                                min: Number(-1.0),
-                                max: Number(-1.0)
-                            },
-                            parent: -1,
-                            invis_holding: Number(0.0),
-                            invis_worn: Number(0.0),
-                            behind_slots: Number(0.0),
-                            invis_cont: Some(Number(0.0))
-                        },
-                        Sprite {
-                            id: 110013,
-                            position: Position {
-                                x: Number(16.0),
-                                y: Number(-12.0)
-                            },
-                            rot: Number(0.0),
+                            rot: Number(-0.025),
                             h_flip: Number(0.0),
                             color: ColorRGB {
                                 r: Number(1.0),
@@ -442,9 +375,9 @@ frontFootIndex=6,15,17,30,36";
                         }
                     ],
                     head_index: vec![-1],
-                    body_index: vec![4, 9, 12, 1],
-                    back_foot_index: vec![9, 19, 22, 33, 39],
-                    front_foot_index: vec![6, 15, 17, 30, 36],
+                    body_index: vec![-1],
+                    back_foot_index: vec![-1],
+                    front_foot_index: vec![-1]
                 }
             ))
         );
